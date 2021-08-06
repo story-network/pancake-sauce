@@ -11,8 +11,8 @@ public class ParserException extends Exception {
     private int errorLine;
     private int errorPos;
 
-    public ParserException(int errorLine, int errorPos) {
-        super("Parse error at line: " + errorLine + " pos: " + errorPos);
+    public ParserException(int errorLine, int errorPos, String message) {
+        super("Parse error at line: " + errorLine + " pos: " + errorPos + ". " + message);
 
         this.errorLine = errorLine;
         this.errorPos = errorPos;

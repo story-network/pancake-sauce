@@ -6,26 +6,32 @@
 
 package sh.pancake.sauce.parser;
 
-import java.util.ArrayList;
 import java.util.Objects;
 
 public class MethodKey {
     
     private String name;
 
-    private ArrayList<String> params;
+    private String args;
 
-    public MethodKey(String name, ArrayList<String> params) {
+    private String returnType;
+
+    public MethodKey(String name, String args, String returnType) {
         this.name = name;
-        this.params = params;
+        this.args = args;
+        this.returnType = returnType;
     }
 
     public String getName() {
         return name;
     }
 
-    public ArrayList<String> getParams() {
-        return params;
+    public String getArgs() {
+        return args;
+    }
+
+    public String getReturnType() {
+        return returnType;
     }
 
     @Override
@@ -35,7 +41,7 @@ public class MethodKey {
         if (obj != null && obj instanceof MethodKey) {
             MethodKey key = (MethodKey) obj;
             
-            return this.name.equals(key.name) && this.params.equals(params);
+            return name.equals(key.name) && args.equals(key.args) && returnType.equals(key.returnType);
         } else {
             return false;
         }
@@ -43,12 +49,12 @@ public class MethodKey {
     
     @Override
     public int hashCode() {
-        return Objects.hash(this.name, this.params);
+        return Objects.hash(this.name, this.args, this.returnType);
     }
 
     @Override
     public String toString() {
-        return name + "(" + String.join(",", this.params.toArray(new String[0])) + ")";
+        return name + "(" + args + ")" + returnType;
     }
 
 }

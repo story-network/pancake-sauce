@@ -10,11 +10,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.common.collect.Lists;
+import sh.pancake.sauce.type.TypeUtil;
+import sh.pancake.sauce.util.ConvertUtil;
 
 public class ProguardParser {
-
-    private static ProguardParser instance;
 
     private static final Pattern CLASS_PATTERN = Pattern.compile("(.+) -> (.+):");
 
@@ -22,15 +21,10 @@ public class ProguardParser {
     private static final Pattern METHOD_PATTERN = Pattern
             .compile("(?:\\d+:){0,2}(.*) (.*)\\((.*)\\)(?::\\d+){0,2} -> (.*)");
 
-    public static ProguardParser getInstance() {
-        if (instance == null)
-            instance = new ProguardParser();
+    private IDupeResolver duplicateResolver;
 
-        return instance;
-    }
-
-    private ProguardParser() {
-
+    public ProguardParser(IDupeResolver duplicateHandler) {
+        this.duplicateResolver = duplicateHandler;
     }
 
     protected ObfucationMap<String, ClassBlock> collectClasses(String obfuscationMap) throws ParserException {
@@ -39,7 +33,8 @@ public class ProguardParser {
         String[] lines = obfuscationMap.split("\n");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
-            if (line.length() < 1 || line.startsWith("#")) continue;
+            if (line.length() < 1 || line.startsWith("#"))
+                continue;
 
             Matcher match = CLASS_PATTERN.matcher(line);
 
@@ -48,17 +43,19 @@ public class ProguardParser {
 
                 for (; i + 1 < lines.length; i++) {
                     String innerLine = lines[i + 1];
-                    if (innerLine.length() < 1 || innerLine.startsWith("#")) continue;
-                    else if (!innerLine.startsWith("    ")) break;
+                    if (innerLine.length() < 1 || innerLine.startsWith("#"))
+                        continue;
+                    else if (!innerLine.startsWith("    "))
+                        break;
 
                     String memberLine = innerLine.substring(4);
 
                     block.getInnerLines().add(memberLine);
                 }
 
-                map.add(match.group(2), match.group(1), block);
+                map.add(TypeUtil.classNameToPath(match.group(2)), TypeUtil.classNameToPath(match.group(1)), block);
             } else {
-                throw new ParserException(i + 1, 0);
+                throw new ParserException(i + 1, 0, "Invalid mapping format.");
             }
         }
 
@@ -70,6 +67,7 @@ public class ProguardParser {
 
         ObfucationMap<String, ClassBlock> classPreMap = collectClasses(obfuscationMap);
         for (String name : classPreMap.originalKeys()) {
+            // System.out.println("MAPPING " + name);
             ClassBlock block = classPreMap.get(name);
 
             ClassVal classVal = new ClassVal();
@@ -81,33 +79,50 @@ public class ProguardParser {
 
                 Matcher methodMatch = METHOD_PATTERN.matcher(line);
                 if (methodMatch.matches()) {
-                    String[] params = methodMatch.group(3).split(",");
+                    String[] args = methodMatch.group(3).split(",");
 
-                    String[] obfParams = new String[params.length];
-                    for (int a = 0; a < obfParams.length; a++) {
-                        String param = params[a];
+                    StringBuilder originalBuilder = new StringBuilder();
+                    StringBuilder obfBuilder = new StringBuilder();
 
-                        String obfuscated = classPreMap.getObfuscated(param);
+                    for (String arg : args) {
+                        if (arg.isEmpty())
+                            continue;
 
-                        if (obfuscated != null) {
-                            obfParams[a] = obfuscated;
-                        } else {
-                            obfParams[a] = param;
+                        String desc = TypeUtil.toASMDesc(arg);
+
+                        originalBuilder.append(desc);
+
+                        obfBuilder.append(ConvertUtil.convertType(classPreMap, desc));
+                    }
+
+                    String originalReturnType = TypeUtil.toASMDesc(methodMatch.group(1));
+
+                    MethodKey original = new MethodKey(methodMatch.group(2), originalBuilder.toString(),
+                            originalReturnType);
+
+                    MethodKey obfKey = new MethodKey(methodMatch.group(4), obfBuilder.toString(),
+                            ConvertUtil.convertType(classPreMap, originalReturnType));
+
+                    MethodVal methodVal = new MethodVal();
+
+                    if (!classVal.getMethodMapping().add(obfKey, original, methodVal)) {
+                        String altName = duplicateResolver.resolve(obfKey, original, methodVal);
+
+                        original = new MethodKey(altName, original.getArgs(), original.getReturnType());
+
+                        if (!classVal.getMethodMapping().add(obfKey, original, methodVal)) {
+                            throw new ParserException(i + block.getStartLine(), 0,
+                                    "Method mapping duplicate and cannot be resolved.");
                         }
                     }
-                    
-                    MethodKey original = new MethodKey(methodMatch.group(2), Lists.newArrayList(params));
-                    MethodKey obfKey = new MethodKey(methodMatch.group(4), Lists.newArrayList(obfParams));
-
-                    classVal.getMethodMapping().add(obfKey, original, new MethodVal(methodMatch.group(1)));
                 } else {
                     Matcher fieldMatch = FIELD_PATTERN.matcher(line);
 
                     if (fieldMatch.matches()) {
                         classVal.getFieldMapping().add(fieldMatch.group(3), fieldMatch.group(2),
-                                new FieldVal(fieldMatch.group(1)));
+                                new FieldVal(TypeUtil.toASMDesc(fieldMatch.group(1))));
                     } else {
-                        throw new ParserException(i + block.getStartLine(), 0);
+                        throw new ParserException(i + block.getStartLine(), 0, "Invalid mapping format.");
                     }
                 }
             }

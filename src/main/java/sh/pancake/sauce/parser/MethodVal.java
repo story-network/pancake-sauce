@@ -7,15 +7,9 @@
 package sh.pancake.sauce.parser;
 
 public class MethodVal {
-    
-    private String returnType;
 
-    public MethodVal(String returnType) {
-        this.returnType = returnType;
-    }
-
-    public String getReturnType() {
-        return returnType;
+    public MethodVal() {
+        
     }
 
 }

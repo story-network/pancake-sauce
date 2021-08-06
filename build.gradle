@@ -34,6 +34,10 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
+test {
+    testLogging.showStandardStreams = true
+}
+
 sourceSets {
     main {
         java {

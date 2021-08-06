@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 import sh.pancake.sauce.parser.ClassVal;
 import sh.pancake.sauce.parser.ConversionTable;
 import sh.pancake.sauce.parser.FieldVal;
+import sh.pancake.sauce.parser.IDupeResolver;
 import sh.pancake.sauce.parser.MethodKey;
-import sh.pancake.sauce.parser.MethodVal;
 import sh.pancake.sauce.parser.ProguardParser;
 
 public class ParserTest {
@@ -20,8 +20,7 @@ public class ParserTest {
     @Test
     public void testParser() throws Exception {
         String mapping = "";
-
-        ProguardParser parser = ProguardParser.getInstance();
+        ProguardParser parser = new ProguardParser(IDupeResolver.SUFFIX_TAG_RESOLVER);
 
         ConversionTable table = parser.parse(mapping);
 
@@ -39,10 +38,9 @@ public class ParserTest {
             }
 
             for (MethodKey originalMethod : classVal.getMethodMapping().originalKeys()) {
-                MethodVal methodVal = classVal.getMethodMapping().get(originalMethod);
-                MethodKey fieldObf = classVal.getMethodMapping().getObfuscated(originalMethod);
+                MethodKey methodObf = classVal.getMethodMapping().getObfuscated(originalMethod);
 
-                System.out.println("    METHOD: " + methodVal.getReturnType() + " " + fieldObf + " -> " + originalMethod);
+                System.out.println("    METHOD: " + methodObf + " -> " + originalMethod);
             }
         }
     }
