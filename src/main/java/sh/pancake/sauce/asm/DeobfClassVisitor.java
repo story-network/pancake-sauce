@@ -15,6 +15,7 @@ import sh.pancake.sauce.parser.ClassVal;
 import sh.pancake.sauce.parser.ConversionTable;
 import sh.pancake.sauce.parser.MethodKey;
 import sh.pancake.sauce.util.ConvertUtil;
+import sh.pancake.sauce.util.ASMUtil;
 
 public class DeobfClassVisitor extends ClassVisitor {
 
@@ -42,18 +43,6 @@ public class DeobfClassVisitor extends ClassVisitor {
         }
     }
 
-    protected MethodKey getMethodKey(String name, Type methodDesc) {
-        Type[] paramTypes = methodDesc.getArgumentTypes();
-        Type returnType = methodDesc.getReturnType();
-
-        StringBuilder argBuilder = new StringBuilder();
-        for (Type paramType : paramTypes) {
-            argBuilder.append(paramType.getDescriptor());
-        }
-
-        return new MethodKey(name, argBuilder.toString(), returnType.getDescriptor());
-    }
-
     @Override
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
         transformClasses(interfaces);
@@ -79,27 +68,18 @@ public class DeobfClassVisitor extends ClassVisitor {
             String[] exceptions) {
         transformClasses(exceptions);
 
+        Type methodDesc = Type.getType(descriptor);
         if (currentClass != null) {
-            Type methodDesc = Type.getType(descriptor);
 
-            MethodKey key = currentClass.getMethodMapping().getDeobfuscated(getMethodKey(name, methodDesc));
+            MethodKey key = currentClass.getMethodMapping().getDeobfuscated(ASMUtil.getMethodKey(name, methodDesc));
             if (key != null) {
                 name = key.getName();
+                descriptor = key.toDescriptor();
+            } else {
+                descriptor = ASMUtil.remapMethodDesc(table, methodDesc);
             }
-
-            Type returnType = Type.getType(
-                    ConvertUtil.convertType(table.getClassMapping(), methodDesc.getReturnType().getDescriptor()));
-            Type[] argTypes = methodDesc.getArgumentTypes();
-            for (int i = 0; i < argTypes.length; i++) {
-                String rawArgDesc = argTypes[i].getDescriptor();
-                String converted = ConvertUtil.convertType(table.getClassMapping(), rawArgDesc);
-
-                if (!converted.equals(rawArgDesc)) {
-                    argTypes[i] = Type.getType(converted);
-                }
-            }
-
-            descriptor = Type.getMethodDescriptor(returnType, argTypes);
+        } else {
+            descriptor = ASMUtil.remapMethodDesc(table, methodDesc);
         }
 
         // System.out.println("METHOD " + name + " " + descriptor);
@@ -109,7 +89,7 @@ public class DeobfClassVisitor extends ClassVisitor {
 
     @Override
     public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-        descriptor = ConvertUtil.convertType(table.getClassMapping(), descriptor);
+        descriptor = ConvertUtil.toDeobfuscatedType(table.getClassMapping(), descriptor);
 
         if (currentClass != null) {
             String deobfName = currentClass.getFieldMapping().getDeobfuscated(name);

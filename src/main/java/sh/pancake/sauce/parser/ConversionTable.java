@@ -14,6 +14,12 @@ public class ConversionTable {
         this.classMapping = new ObfucationMap<>();
     }
 
+    public ConversionTable(ConversionTable other) {
+        this.classMapping = new ObfucationMap<>();
+
+        classMapping.getInnerMap().add(other.classMapping);
+    }
+
     public ObfucationMap<String, ClassVal> getClassMapping() {
         return classMapping;
     }

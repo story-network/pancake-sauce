@@ -7,6 +7,7 @@
 package sh.pancake.sauce.parser;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -14,34 +15,55 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
 public class ObfucationMap<K, V> {
+
+    private Set<ObfucationMap<K, V>> innerMap;
     
     private BiMap<K, K> mapping;
 
     private Map<K, V> originalMap;
 
     public ObfucationMap() {
+        this.innerMap = new HashSet<>();
+
         this.mapping = HashBiMap.create();
         this.originalMap = new HashMap<>();
     }
 
     public K getDeobfuscated(K obfuscated) {
-        return mapping.get(obfuscated);
+        K deobfuscated = mapping.get(obfuscated);
+        if (deobfuscated != null) return deobfuscated;
+
+        for (ObfucationMap<K, V> inner : this.innerMap) {
+            K innerDeobf = inner.getDeobfuscated(obfuscated);
+            if (innerDeobf != null) return innerDeobf;
+        }
+
+        return null;
     }
 
     public K getObfuscated(K deobfuscated) {
-        return mapping.inverse().get(deobfuscated);
-    }
+        K obfuscated = mapping.inverse().get(deobfuscated);
 
-    public V getFromObfuscated(K obfuscatedKey) {
-        K deobfuscated = getDeobfuscated(obfuscatedKey);
+        if (obfuscated != null) return obfuscated;
 
-        if (deobfuscated == null) return null;
+        for (ObfucationMap<K, V> inner : this.innerMap) {
+            K innerObf = inner.getObfuscated(deobfuscated);
+            if (innerObf != null) return innerObf;
+        }
 
-        return originalMap.get(deobfuscated);
+        return null;
     }
 
     public V get(K key) {
-        return originalMap.get(key);
+        V value = originalMap.get(key);
+        if (value != null) return originalMap.get(key);
+
+        for (ObfucationMap<K, V> inner : this.innerMap) {
+            V innerVal = inner.get(key);
+            if (innerVal != null) return innerVal;
+        }
+
+        return null;
     }
 
     public Set<K> originalKeys() {
@@ -59,6 +81,10 @@ public class ObfucationMap<K, V> {
         originalMap.put(original, value);
 
         return true;
+    }
+
+    public Set<ObfucationMap<K, V>> getInnerMap() {
+        return innerMap;
     }
 
 }

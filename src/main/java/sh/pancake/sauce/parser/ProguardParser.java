@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 import sh.pancake.sauce.type.TypeUtil;
 import sh.pancake.sauce.util.ConvertUtil;
 
-public class ProguardParser {
+public class ProguardParser implements IMappingParser {
 
     private static final Pattern CLASS_PATTERN = Pattern.compile("(.+) -> (.+):");
 
@@ -77,53 +77,9 @@ public class ProguardParser {
             for (int i = 0; i < innerSize; i++) {
                 String line = innerLines.get(i);
 
-                Matcher methodMatch = METHOD_PATTERN.matcher(line);
-                if (methodMatch.matches()) {
-                    String[] args = methodMatch.group(3).split(",");
-
-                    StringBuilder originalBuilder = new StringBuilder();
-                    StringBuilder obfBuilder = new StringBuilder();
-
-                    for (String arg : args) {
-                        if (arg.isEmpty())
-                            continue;
-
-                        String desc = TypeUtil.toASMDesc(arg);
-
-                        originalBuilder.append(desc);
-
-                        obfBuilder.append(ConvertUtil.convertType(classPreMap, desc));
-                    }
-
-                    String originalReturnType = TypeUtil.toASMDesc(methodMatch.group(1));
-
-                    MethodKey original = new MethodKey(methodMatch.group(2), originalBuilder.toString(),
-                            originalReturnType);
-
-                    MethodKey obfKey = new MethodKey(methodMatch.group(4), obfBuilder.toString(),
-                            ConvertUtil.convertType(classPreMap, originalReturnType));
-
-                    MethodVal methodVal = new MethodVal();
-
-                    if (!classVal.getMethodMapping().add(obfKey, original, methodVal)) {
-                        String altName = duplicateResolver.resolve(obfKey, original, methodVal);
-
-                        original = new MethodKey(altName, original.getArgs(), original.getReturnType());
-
-                        if (!classVal.getMethodMapping().add(obfKey, original, methodVal)) {
-                            throw new ParserException(i + block.getStartLine(), 0,
-                                    "Method mapping duplicate and cannot be resolved.");
-                        }
-                    }
-                } else {
-                    Matcher fieldMatch = FIELD_PATTERN.matcher(line);
-
-                    if (fieldMatch.matches()) {
-                        classVal.getFieldMapping().add(fieldMatch.group(3), fieldMatch.group(2),
-                                new FieldVal(TypeUtil.toASMDesc(fieldMatch.group(1))));
-                    } else {
-                        throw new ParserException(i + block.getStartLine(), 0, "Invalid mapping format.");
-                    }
+                if (!tryParseMethod(i, classPreMap, block, classVal, line)
+                        && !tryParseField(i, classPreMap, block, classVal, line)) {
+                    throw new ParserException(i + block.getStartLine(), 0, "Invalid mapping format.");
                 }
             }
 
@@ -131,6 +87,67 @@ public class ProguardParser {
         }
 
         return table;
+    }
+
+    private boolean tryParseMethod(int i, ObfucationMap<String, ClassBlock> classPreMap, ClassBlock block,
+            ClassVal classVal, String line) throws ParserException {
+        Matcher methodMatch = METHOD_PATTERN.matcher(line);
+
+        if (methodMatch.matches()) {
+            String[] args = methodMatch.group(3).split(",");
+
+            StringBuilder originalBuilder = new StringBuilder();
+            StringBuilder obfBuilder = new StringBuilder();
+
+            for (String arg : args) {
+                if (arg.isEmpty())
+                    continue;
+
+                String desc = TypeUtil.toASMDesc(arg);
+
+                originalBuilder.append(desc);
+
+                obfBuilder.append(ConvertUtil.toObfuscatedType(classPreMap, desc));
+            }
+
+            String originalReturnType = TypeUtil.toASMDesc(methodMatch.group(1));
+
+            MethodKey original = new MethodKey(methodMatch.group(2), originalBuilder.toString(), originalReturnType);
+
+            MethodKey obfKey = new MethodKey(methodMatch.group(4), obfBuilder.toString(),
+                    ConvertUtil.toObfuscatedType(classPreMap, originalReturnType));
+
+            MethodVal methodVal = new MethodVal();
+
+            if (!classVal.getMethodMapping().add(obfKey, original, methodVal)) {
+                String altName = duplicateResolver.resolve(obfKey, original, methodVal);
+
+                original = new MethodKey(altName, original.getArgs(), original.getReturnType());
+
+                if (!classVal.getMethodMapping().add(obfKey, original, methodVal)) {
+                    throw new ParserException(i + block.getStartLine(), 0,
+                            "Method mapping duplicate and cannot be resolved.");
+                }
+            }
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean tryParseField(int i, ObfucationMap<String, ClassBlock> classPreMap, ClassBlock block,
+            ClassVal classVal, String line) throws ParserException {
+        Matcher fieldMatch = FIELD_PATTERN.matcher(line);
+
+        if (fieldMatch.matches()) {
+            classVal.getFieldMapping().add(fieldMatch.group(3), fieldMatch.group(2),
+                    new FieldVal(TypeUtil.toASMDesc(fieldMatch.group(1))));
+
+            return true;
+        } else {
+            return false;
+        }
     }
 
 }

@@ -46,6 +46,16 @@ public class MethodKey {
             return false;
         }
     }
+
+    public String toDescriptor() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("(");
+        builder.append(args);
+        builder.append(")");
+        builder.append(returnType);
+
+        return builder.toString();
+    }
     
     @Override
     public int hashCode() {
