@@ -20,6 +20,9 @@ import org.objectweb.asm.ClassWriter;
 import sh.pancake.sauce.asm.PancakeClassRemapper;
 import sh.pancake.sauce.parser.ConversionTable;
 
+/**
+ * Main remapper class
+ */
 public class PancakeSauce {
 
     private ZipInputStream stream;
@@ -30,11 +33,24 @@ public class PancakeSauce {
         this.table = table;
     }
 
+    /**
+     * Remap class files in archive stream and emit to @param output
+     *
+     * @param output Output stream
+     * @throws IOException
+     */
     public void remapJar(ZipOutputStream output) throws IOException {
         remapJar(output, null);
     }
 
-    public void remapJar(ZipOutputStream output, Consumer<RemapInfo> processCb) throws IOException {
+    /**
+     * Remap class files in archive stream and emit to @param output
+     *
+     * @param output Output stream
+     * @param progressCb Progress callback
+     * @throws IOException
+     */
+    public void remapJar(ZipOutputStream output, Consumer<RemapInfo> progressCb) throws IOException {
         List<String> entries = new ArrayList<>();
 
         for (ZipEntry entry = stream.getNextEntry(); entry != null; entry = stream.getNextEntry()) {
@@ -45,7 +61,7 @@ public class PancakeSauce {
 
                 RemapInfo info = this.remapClass(data);
 
-                if (processCb != null) processCb.accept(info);
+                if (progressCb != null) progressCb.accept(info);
 
                 output.putNextEntry(new ZipEntry(info.getToName()));
                 
@@ -63,7 +79,7 @@ public class PancakeSauce {
         }
     }
 
-    public RemapInfo remapClass(byte[] clazz) {
+    private RemapInfo remapClass(byte[] clazz) {
         ClassReader reader = new ClassReader(clazz);
         ClassWriter writer = new ClassWriter(0);
         PancakeClassRemapper remapper = new PancakeClassRemapper(writer, table);

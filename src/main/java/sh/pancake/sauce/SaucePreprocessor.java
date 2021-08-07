@@ -12,12 +12,24 @@ import org.objectweb.asm.Opcodes;
 import sh.pancake.sauce.asm.TablePreprocessor;
 import sh.pancake.sauce.parser.ConversionTable;
 
+/**
+ * Mapping preprocessor.
+ * 
+ * Preprocessor must be run before remapping jar file. It is required to analysis inheritance tree and interfaces.
+ */
 public class SaucePreprocessor {
 
     public SaucePreprocessor() {
         
     }
 
+    /**
+     * Preprocess given ConversionTable
+     *
+     * @param input Zip stream to analysis
+     * @param table Table to be preprocessed
+     * @throws IOException
+     */
     public void process(ZipInputStream input, ConversionTable table) throws IOException {
         List<String> entries = new ArrayList<>();
 
