@@ -13,6 +13,9 @@ import java.util.regex.Pattern;
 import sh.pancake.sauce.type.TypeUtil;
 import sh.pancake.sauce.util.ConvertUtil;
 
+/**
+ * Proguard mapping parser
+ */
 public class ProguardParser implements IMappingParser {
 
     private static final Pattern CLASS_PATTERN = Pattern.compile("(.+) -> (.+):");
