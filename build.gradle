@@ -6,6 +6,7 @@
 
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
 group 'sh.pancake'
@@ -48,6 +49,14 @@ sourceSets {
 
         resources {
             srcDir 'src/main/resources'
+        }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            url = file('../maven')
         }
     }
 }
