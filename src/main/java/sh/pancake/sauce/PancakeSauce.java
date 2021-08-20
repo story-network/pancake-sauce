@@ -105,8 +105,8 @@ public class PancakeSauce {
                 });
             } else {
                 synchronized (output) {
-                    stream.transferTo(output);
                     output.putNextEntry(entry);
+                    stream.transferTo(output);
                     output.closeEntry();
                 }
             }
