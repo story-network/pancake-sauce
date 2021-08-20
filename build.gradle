@@ -54,6 +54,12 @@ sourceSets {
 }
 
 publishing {
+    publications {
+        lib(MavenPublication) {
+            from components.java
+        }
+    }
+
     repositories {
         maven {
             url = file('../maven')
