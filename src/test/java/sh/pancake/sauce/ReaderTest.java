@@ -20,7 +20,7 @@ import sh.pancake.sauce.parser.ProguardParser;
 
 public class ReaderTest {
 
-    @Test
+    // @Test
     public void testClass() throws Exception {
         try (FileInputStream input = new FileInputStream(new File("server.txt"))) {
             String mapping = new String(input.readAllBytes());
