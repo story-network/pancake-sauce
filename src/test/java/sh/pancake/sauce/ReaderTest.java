@@ -33,9 +33,9 @@ public class ReaderTest {
             fileStream.close();
 
             try(ZipInputStream serverInput = new ZipInputStream(new ByteArrayInputStream(data))) {
-                SaucePreprocessor preprocessor = new SaucePreprocessor();
+                SaucePreprocessor preprocessor = new SaucePreprocessor(serverInput);
 
-                preprocessor.process(serverInput, table);
+                preprocessor.process(table);
             }
 
             try (

@@ -11,9 +11,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.zip.ZipEntry;
@@ -47,7 +47,7 @@ public class PancakeSauce {
     }
 
     /**
-     * Remap class files in archive stream and emit to @param output
+     * Remap class files in archive stream and emit to output
      *
      * @param output Output stream
      * @throws IOException
@@ -57,9 +57,9 @@ public class PancakeSauce {
     }
 
     /**
-     * Remap class files in archive stream and emit to @param output
+     * Remap class files in archive stream and emit to output
      *
-     * @param output Output stream
+     * @param output     Output stream
      * @param progressCb Progress callback
      * @throws IOException
      */
@@ -85,38 +85,74 @@ public class PancakeSauce {
         }
     }
 
-    public List<Future<Void>> remapJarAsync(ExecutorService service, ZipOutputStream output, Consumer<RemapInfo> progressCb) throws IOException, InterruptedException {
-        Set<String> entries = new HashSet<>();
-        List<Callable<Void>> tasks = new ArrayList<>();
+    /**
+     * Remap class files in archive stream and emit to output asynchronously
+     *
+     * @param service    Executor
+     * @param output     Output stream
+     * @throws CompletionException
+     */
+    public CompletableFuture<Void> remapJarAsync(Executor executor, ZipOutputStream output) throws IOException, InterruptedException {
+        return remapJarAsync(executor, output, null);
+    }
 
-        for (ZipEntry entry = stream.getNextEntry(); entry != null; entry = stream.getNextEntry()) {
-            if (entries.contains(entry.getName())) continue;
+    /**
+     * Remap class files in archive stream and emit to output asynchronously
+     *
+     * @param service    Executor
+     * @param output     Output stream
+     * @param progressCb Progress callback
+     * @throws CompletionException
+     */
+    public CompletableFuture<Void> remapJarAsync(Executor executor, ZipOutputStream output, Consumer<RemapInfo> progressCb) throws CompletionException {
+        CompletableFuture<Void> future = new CompletableFuture<>();
 
-            if (entry.getName().endsWith(".class") && (filter == null || filter.apply(entry))) {
-                ZipEntry currentEntry = entry;
-                byte[] data = stream.readAllBytes();
+        executor.execute(() -> {
+            try {
+                Set<String> entries = new HashSet<>();
+                List<CompletableFuture<Void>> tasks = new ArrayList<>();
 
-                tasks.add(() -> {
-                    RemapInfo info = rewriteEntry(data, currentEntry, output);
+                for (ZipEntry entry = stream.getNextEntry(); entry != null; entry = stream.getNextEntry()) {
+                    if (entries.contains(entry.getName()))
+                        continue;
 
-                    if (progressCb != null) progressCb.accept(info);
+                    if (entry.getName().endsWith(".class") && (filter == null || filter.apply(entry))) {
+                        ZipEntry currentEntry = entry;
+                        byte[] data = stream.readAllBytes();
 
-                    return null;
-                });
-            } else {
-                synchronized (output) {
-                    output.putNextEntry(entry);
-                    stream.transferTo(output);
-                    output.closeEntry();
+                        tasks.add(CompletableFuture.runAsync(() -> {
+                            try {
+                                RemapInfo info = rewriteEntry(data, currentEntry, output);
+
+                                if (progressCb != null) progressCb.accept(info);
+                            } catch (Exception e) {
+                                throw new CompletionException(e);
+                            }
+                        }, executor));
+                    } else {
+                        synchronized (output) {
+                            output.putNextEntry(entry);
+                            stream.transferTo(output);
+                            output.closeEntry();
+                        }
+                    }
+
+                    entries.add(entry.getName());
+
+                    stream.closeEntry();
                 }
+
+                for (CompletableFuture<Void> taskFuture : tasks) {
+                    taskFuture.join();
+                }
+
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
             }
+        });
 
-            entries.add(entry.getName());
-
-            stream.closeEntry();
-        }
-
-        return service.invokeAll(tasks);
+        return future;
     }
 
     private RemapInfo rewriteEntry(byte[] clazz, ZipEntry entry, ZipOutputStream output) throws IOException {
